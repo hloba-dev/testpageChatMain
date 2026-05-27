@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>5 міфів про AI — HlobaFlow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root {
+            --bg: #080808;
+            --accent: #ff6b00;
+            --accent-soft: #ff8c33;
+            --muted: #aaaaaa;
+            --dim: #666666;
+        }
+        html, body { width: 100%; height: 100%; overflow: hidden; background: #050505; font-family: "Manrope", -apple-system, sans-serif; color: #fff; }
+        body {
+            background-image:
+                radial-gradient(ellipse at top, rgba(255,107,0,.06), transparent 60%),
+                radial-gradient(ellipse at bottom, rgba(255,107,0,.04), transparent 60%);
+            display: flex; align-items: center; justify-content: center;
+        }
+        #root { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 16px; }
+
+        /* Instagram carousel frame: 4:5 portrait (1080x1350) */
+        .frame {
+            position: relative;
+            aspect-ratio: 4 / 5;
+            height: min(92vh, calc(100vw * 5 / 4));
+            max-height: 92vh;
+            width: auto;
+            background: var(--bg);
+            border-radius: 14px;
+            overflow: hidden;
+            box-shadow: 0 30px 80px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.05);
+            user-select: none;
+            container-type: inline-size;
+        }
+
+        /* Top bar */
+        .topbar {
+            position: absolute; top: 0; left: 0; right: 0;
+            padding: 5cqi 6cqi 0;
+            display: flex; justify-content: space-between; align-items: center;
+            z-index: 10;
+        }
+        .logo { font-family: "Bebas Neue", sans-serif; font-size: 4.5cqi; letter-spacing: 1.5px; }
+        .logo .hloba { color: #fff; }
+        .logo .flow { color: var(--accent); }
+        .counter { font-size: 2.6cqi; color: var(--dim); font-weight: 600; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
+
+        /* Progress bar at bottom */
+        .progress {
+            position: absolute; left: 6cqi; right: 6cqi; bottom: 4cqi;
+            height: 2px; background: rgba(255,255,255,.08);
+            z-index: 10; border-radius: 2px; overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%; background: var(--accent);
+            transition: width .35s ease;
+        }
+
+        /* Slide canvas */
+        .slides {
+            position: absolute; inset: 0;
+        }
+        .slide {
+            position: absolute; inset: 0;
+            padding: 14cqi 6cqi 9cqi;
+            display: flex; flex-direction: column;
+            opacity: 0;
+            transform: translateX(20px);
+            transition: opacity .35s ease, transform .4s cubic-bezier(.2,.9,.3,1);
+            pointer-events: none;
+            overflow: hidden;
+        }
+        .slide.active { opacity: 1; transform: translateX(0); pointer-events: auto; }
+        .slide.prev { transform: translateX(-20px); }
+
+        /* Tags */
+        .tag {
+            display: inline-flex; align-items: center;
+            font-family: "Bebas Neue", sans-serif;
+            letter-spacing: 1.8px;
+            font-size: 2.8cqi;
+            padding: 1.4cqi 2.6cqi;
+            border-radius: 10px;
+            border: 1.5px solid var(--accent);
+            color: var(--accent);
+            background: transparent;
+            line-height: 1;
+            width: fit-content;
+        }
+        .tag.solid { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 800; }
+
+        .tag-row { display: flex; gap: 1cqi; }
+
+        /* Headings */
+        .h-myth {
+            font-family: "Bebas Neue", sans-serif;
+            font-size: 11.5cqi;
+            line-height: .95;
+            color: var(--dim);
+            position: relative;
+            letter-spacing: 1px;
+            margin: 3cqi 0;
+            display: inline-block;
+            text-transform: uppercase;
+        }
+        .h-myth::after {
+            content: "";
+            position: absolute;
+            top: 50%; left: -1cqi; right: -1cqi;
+            height: 2.5px; background: var(--accent);
+            transform: translateY(-50%) rotate(-3deg);
+        }
+        .h-myth.multiline::after { display: none; }
+        .h-myth.multiline span {
+            display: inline; background-image: linear-gradient(var(--accent), var(--accent));
+            background-size: 100% 2.5px; background-repeat: no-repeat; background-position: 0 55%;
+        }
+
+        .divider { width: 80px; height: 2px; background: var(--accent); margin: 4cqi 0; border-radius: 2px; }
+        .divider.full { width: 100%; background: rgba(255,255,255,.08); margin: 4cqi 0; }
+
+        /* Lists */
+        .list { display: flex; flex-direction: column; gap: 2.4cqi; margin-top: 1cqi; }
+        .list li {
+            list-style: none;
+            display: flex;
+            gap: 1.6cqi;
+            font-family: "Manrope", sans-serif;
+            font-size: 2.7cqi;
+            line-height: 1.35;
+            color: #fff;
+            font-weight: 500;
+        }
+        .list li .arr { color: var(--accent); flex-shrink: 0; font-weight: 700; }
+        .list li b { color: var(--accent); font-family: "Bebas Neue", sans-serif; font-size: 5.4cqi; letter-spacing: 1px; margin-right: 1cqi; vertical-align: -.4cqi; }
+
+        .quote {
+            font-family: "Manrope", sans-serif;
+            font-size: 2.5cqi;
+            color: var(--accent-soft);
+            font-style: italic;
+            line-height: 1.4;
+            font-weight: 500;
+            margin-top: auto;
+        }
+
+        /* Cover slide */
+        .cover {
+            position: absolute; inset: 0;
+            background-image: url("/cover.jpg");
+            background-size: cover;
+            background-position: center 30%;
+        }
+        .cover-tint {
+            position: absolute; inset: 0;
+            background:
+                linear-gradient(180deg,
+                    rgba(8,8,8,.92) 0%,
+                    rgba(8,8,8,.75) 18%,
+                    rgba(8,8,8,.25) 32%,
+                    rgba(8,8,8,0)   45%,
+                    rgba(8,8,8,0)   78%,
+                    rgba(8,8,8,.85) 95%,
+                    rgba(8,8,8,.96) 100%);
+        }
+        .cover-content {
+            position: relative;
+            height: 100%;
+            display: flex; flex-direction: column; justify-content: space-between;
+            padding: 14cqi 6cqi 9cqi;
+            z-index: 2;
+        }
+        .cover-top { display: flex; flex-direction: column; }
+        .cover-title {
+            font-family: "Bebas Neue", sans-serif;
+            font-size: 15cqi;
+            line-height: .88;
+            letter-spacing: 1.5px;
+            text-shadow: 0 2px 14px rgba(0,0,0,.55);
+        }
+        .cover-title .line1 { color: #fff; }
+        .cover-title .line2 { color: var(--accent); }
+        .cover-sub {
+            font-family: "Manrope", sans-serif;
+            font-size: 2.8cqi;
+            color: #d8d8d8;
+            font-weight: 500;
+            margin-top: 2.5cqi;
+            line-height: 1.3;
+            text-shadow: 0 1px 8px rgba(0,0,0,.7);
+        }
+        .cover-bottom {
+            display: flex; flex-direction: column; align-items: flex-end; gap: 2cqi;
+        }
+        .cover-author {
+            font-family: "Bebas Neue", sans-serif;
+            font-size: 3cqi;
+            letter-spacing: 2.5px;
+            color: rgba(255,255,255,.7);
+        }
+        .cover-author span { color: var(--accent); }
+        .cover-swipe {
+            align-self: flex-end;
+        }
+
+        /* Slide 7 — summary */
+        .summary-h {
+            font-family: "Bebas Neue", sans-serif;
+            font-size: 14cqi;
+            color: #fff;
+            line-height: .95;
+            letter-spacing: 1.5px;
+        }
+        .summary-sub {
+            font-family: "Manrope", sans-serif;
+            font-size: 3.4cqi;
+            color: var(--muted);
+            line-height: 1.35;
+            margin-top: 4cqi;
+        }
+        .summary-cta {
+            font-family: "Bebas Neue", sans-serif;
+            font-size: 8cqi;
+            color: var(--accent);
+            letter-spacing: 2px;
+            margin-top: auto;
+        }
+
+        /* Slide 8 — CTA */
+        .cta-h {
+            font-family: "Bebas Neue", sans-serif;
+            font-size: 10.5cqi;
+            color: #fff;
+            line-height: .95;
+            letter-spacing: 1.5px;
+            margin-top: 3cqi;
+        }
+        .cta-list { display: flex; flex-direction: column; gap: 1.5cqi; }
+        .cta-list li { font-family: "Manrope", sans-serif; font-size: 2.8cqi; color: var(--muted); list-style: none; font-weight: 500; }
+        .cta-list li .num { color: var(--accent); font-family: "Bebas Neue", sans-serif; font-size: 3.4cqi; margin-right: 1.4cqi; }
+        .cta-action { color: var(--accent-soft); font-family: "Manrope", sans-serif; font-size: 2.6cqi; line-height: 1.5; font-weight: 600; }
+        .cta-logo {
+            font-family: "Bebas Neue", sans-serif;
+            font-size: 8cqi;
+            letter-spacing: 3px;
+            text-align: center;
+            margin-top: auto;
+        }
+        .cta-logo .h { color: #fff; }
+        .cta-logo .f { color: var(--accent); }
+
+        /* Controls */
+        .controls {
+            display: flex; align-items: center; gap: 14px;
+            font-family: "Manrope", sans-serif;
+        }
+        .ctl-btn {
+            background: rgba(255,255,255,.06);
+            border: 1px solid rgba(255,255,255,.12);
+            color: #fff;
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            font-size: 18px;
+            cursor: pointer;
+            display: inline-flex; align-items: center; justify-content: center;
+            transition: background .15s, border-color .15s;
+        }
+        .ctl-btn:hover { background: rgba(255,255,255,.12); border-color: var(--accent); }
+        .ctl-btn:disabled { opacity: .35; cursor: not-allowed; }
+        .dots { display: flex; gap: 6px; }
+        .dot {
+            width: 7px; height: 7px; border-radius: 50%;
+            background: rgba(255,255,255,.18);
+            cursor: pointer;
+            transition: background .2s, transform .2s;
+        }
+        .dot.active { background: var(--accent); transform: scale(1.4); }
+
+        .hint {
+            font-family: "Manrope", sans-serif;
+            color: #5a5a5a; font-size: 12px;
+            letter-spacing: .5px;
+        }
+
+        @media (max-width: 720px) {
+            #root { gap: 10px; }
+            .frame { height: 88vh; }
+            .hint { display: none; }
+        }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const TOTAL = 8;
+
+const myths = [
+  {
+    n: "01",
+    titleLines: ["AI ЗАМІНИТЬ МЕНЕ", "НА РОБОТІ"],
+    points: [
+      "AI замінює задачі, а не професії",
+      "На місце старих ролей приходять нові",
+      "Маркетолог з AI замінить 3-х маркетологів без AI"
+    ],
+    quote: "Тебе не замінить AI. Тебе замінить людина, яка вміє працювати з AI."
+  },
+  {
+    n: "02",
+    titleLines: ["AI — ЦЕ ДЛЯ", "АЙТІШНИКІВ.", "Я НЕ ПОТРАПЛЮ"],
+    points: [
+      "80% AI-інструментів — no-code: n8n, Make, Zapier",
+      "Найсильніші AI-фахівці виходять з маркетингу і продажів",
+      "Бо вони бачать процеси бізнесу, а не код"
+    ]
+  },
+  {
+    n: "03",
+    titleLines: ["CHATGPT ВСЕ ЗНАЄ", "І НЕ ПОМИЛЯЄТЬСЯ"],
+    points: [
+      "AI не «знає» — він прогнозує найімовірніше наступне слово",
+      "Може впевнено вигадати книгу, цитату, посилання",
+      "Перевіряти факти, цифри, цитати — твоя робота"
+    ]
+  },
+  {
+    n: "04",
+    titleLines: ["ТРЕБА РОКАМИ", "ВЧИТИСЯ ЩОБ", "ЩОСЬ РОБИТИ"],
+    metrics: [
+      { big: "1 ТИЖДЕНЬ", text: "перша робоча автоматизація" },
+      { big: "1 МІСЯЦЬ",  text: "перший платний проєкт" },
+      { big: "3 МІСЯЦІ",  text: "стабільні замовлення" }
+    ],
+    quote: "Перевірено на сотнях людей. Це не магія. Це послідовність."
+  },
+  {
+    n: "05",
+    titleLines: ["УСІ КУРСИ З AI —", "РОЗВОДНЯК.", "НА YOUTUBE ВСЕ Є"],
+    points: [
+      "На YouTube — шматки без системи",
+      "Платиш за порядок, ком'юніті, реальні кейси",
+      "Один проєкт від клієнта окуповує курс"
+    ],
+    quote: "Питання не «скільки коштує курс». Питання — скільки ще місяців ти повторюватимеш одне й те саме руками."
+  }
+];
+
+function TopBar({ index }) {
+  return (
+    <div className="topbar">
+      <div className="logo"><span className="hloba">HLOBA</span><span className="flow">FLOW</span></div>
+      <div className="counter">{String(index + 1).padStart(2, "0")} / {String(TOTAL).padStart(2, "0")}</div>
+    </div>
+  );
+}
+
+function Progress({ index }) {
+  const pct = ((index + 1) / TOTAL) * 100;
+  return (
+    <div className="progress"><div className="progress-fill" style={{ width: `${pct}%` }} /></div>
+  );
+}
+
+function MythSlide({ myth, active }) {
+  return (
+    <>
+      <span className="tag">МІФ {myth.n}</span>
+      <h2 className={`h-myth ${myth.titleLines.length > 1 ? "multiline" : ""}`}>
+        {myth.titleLines.map((l, i) => (
+          <React.Fragment key={i}>
+            <span>{l}</span>{i < myth.titleLines.length - 1 && <br/>}
+          </React.Fragment>
+        ))}
+      </h2>
+      <div className="divider"></div>
+      <span className="tag solid">НАСПРАВДІ</span>
+      {myth.points && (
+        <ul className="list" style={{ marginTop: "3cqi" }}>
+          {myth.points.map((p, i) => <li key={i}><span className="arr">→</span><span>{p}</span></li>)}
+        </ul>
+      )}
+      {myth.metrics && (
+        <ul className="list" style={{ marginTop: "3cqi" }}>
+          {myth.metrics.map((m, i) => (
+            <li key={i}><span className="arr">→</span><span><b>{m.big}</b>{m.text}</span></li>
+          ))}
+        </ul>
+      )}
+      {myth.quote && <div className="divider full"></div>}
+      {myth.quote && <div className="quote">{myth.quote}</div>}
+    </>
+  );
+}
+
+function CoverSlide() {
+  return (
+    <>
+      <div className="cover"></div>
+      <div className="cover-tint"></div>
+      <div className="cover-content">
+        <div className="cover-top">
+          <h1 className="cover-title">
+            <div className="line1">5 МІФІВ</div>
+            <div className="line2">ПРО AI</div>
+          </h1>
+          <p className="cover-sub">у які досі вірять<br/>навіть розумні люди</p>
+        </div>
+        <div className="cover-bottom">
+          <span className="cover-author">HLOBA<span>FLOW</span></span>
+          <span className="tag cover-swipe">→ СВАЙП</span>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function SummarySlide() {
+  return (
+    <>
+      <h2 className="summary-h">AI — ЦЕ<br/>НЕ МАГІЯ.<br/><br/>І НЕ ДЛЯ<br/>ОБРАНИХ.</h2>
+      <div className="divider"></div>
+      <p className="summary-sub">Це інструмент.<br/>Як інтернет у 2000-му.</p>
+      <div className="summary-cta">ТИ ЗАЙДЕШ ЗАРАЗ?</div>
+    </>
+  );
+}
+
+function CtaSlide() {
+  return (
+    <>
+      <span className="tag">ТВОЯ ЧЕРГА</span>
+      <h2 className="cta-h">У ЯКИЙ МІФ<br/>ТИ ВІРИВ<br/>НАЙДОВШЕ?</h2>
+      <div className="divider"></div>
+      <ul className="cta-list">
+        <li><span className="num">1</span>замінить на роботі</li>
+        <li><span className="num">2</span>це для айтішників</li>
+        <li><span className="num">3</span>ChatGPT все знає</li>
+        <li><span className="num">4</span>треба роками вчитись</li>
+        <li><span className="num">5</span>курси розводняк</li>
+      </ul>
+      <div className="divider full"></div>
+      <div className="cta-action">↓ постав номер у коментарях<br/>↓ збережи цей пост</div>
+      <div className="cta-logo"><span className="h">HLOBA</span><span className="f">FLOW</span></div>
+    </>
+  );
+}
+
+function App() {
+  const [index, setIndex] = useState(0);
+  const touchStart = useRef(null);
+
+  const go = (i) => setIndex(Math.max(0, Math.min(TOTAL - 1, i)));
+  const next = () => go(index + 1);
+  const prev = () => go(index - 1);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); next(); }
+      if (e.key === "ArrowLeft") { e.preventDefault(); prev(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  const onTouchStart = (e) => { touchStart.current = e.touches[0].clientX; };
+  const onTouchEnd = (e) => {
+    if (touchStart.current == null) return;
+    const dx = e.changedTouches[0].clientX - touchStart.current;
+    if (Math.abs(dx) > 40) dx < 0 ? next() : prev();
+    touchStart.current = null;
+  };
+
+  const renderSlide = (i) => {
+    if (i === 0) return <CoverSlide />;
+    if (i >= 1 && i <= 5) return <MythSlide myth={myths[i - 1]} active={i === index} />;
+    if (i === 6) return <SummarySlide />;
+    if (i === 7) return <CtaSlide />;
+    return null;
+  };
+
+  return (
+    <>
+      <div className="frame" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        <TopBar index={index} />
+        <div className="slides">
+          {Array.from({ length: TOTAL }).map((_, i) => (
+            <div
+              key={i}
+              className={`slide ${i === index ? "active" : i < index ? "prev" : ""}`}
+              style={i === 0 ? { padding: 0 } : undefined}
+            >
+              {renderSlide(i)}
+            </div>
+          ))}
+        </div>
+        <Progress index={index} />
+      </div>
+
+      <div className="controls">
+        <button className="ctl-btn" onClick={prev} disabled={index === 0} aria-label="Назад">←</button>
+        <div className="dots">
+          {Array.from({ length: TOTAL }).map((_, i) => (
+            <span key={i} className={`dot ${i === index ? "active" : ""}`} onClick={() => go(i)} />
+          ))}
+        </div>
+        <button className="ctl-btn" onClick={next} disabled={index === TOTAL - 1} aria-label="Вперед">→</button>
+      </div>
+      <div className="hint">← → стрілки · клік по точках · свайп на мобільному</div>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

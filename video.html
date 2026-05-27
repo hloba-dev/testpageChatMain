@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>РІЗНИЦЯ — В РУКАХ</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            width: 100%; height: 100%; overflow: hidden;
+            background: #050608;
+            background-image:
+                radial-gradient(ellipse at top, rgba(32,87,255,.08), transparent 60%),
+                radial-gradient(ellipse at bottom, rgba(87,214,141,.06), transparent 60%);
+            font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+            color: #e6e8ee;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #root { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+
+        /* Reels frame: 9:16 portrait, centered. Sized to fit viewport height. */
+        .stage {
+            position: relative;
+            aspect-ratio: 9 / 16;
+            height: min(100vh, calc(100vw * 16 / 9));
+            max-height: 100vh;
+            width: auto;
+            background: #0b0d12;
+            display: grid;
+            grid-template-rows: 1fr 1fr;
+            overflow: hidden;
+            border-radius: 18px;
+            box-shadow: 0 30px 80px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04);
+        }
+        .stage::after {
+            content: "";
+            position: absolute;
+            left: 6%; right: 6%;
+            top: 50%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #2a2f3d 25%, #2a2f3d 75%, transparent);
+            transform: translateY(-.5px);
+            z-index: 5;
+        }
+
+        .pane { position: relative; padding: 18px 16px; display: flex; flex-direction: column; overflow: hidden; }
+        .pane-tag {
+            position: absolute; top: 10px; left: 14px;
+            font-size: 10px; letter-spacing: 1.2px; text-transform: uppercase;
+            padding: 3px 8px; border-radius: 999px;
+            font-weight: 700;
+            z-index: 6;
+        }
+        .pane-left .pane-tag { background: rgba(255,80,80,.12); color: #ff6b6b; border: 1px solid rgba(255,80,80,.3); }
+        .pane-right .pane-tag { background: rgba(80,200,120,.12); color: #57d68d; border: 1px solid rgba(80,200,120,.3); }
+
+        .chat {
+            margin-top: 32px;
+            flex: 1;
+            background: #15181f;
+            border: 1px solid #232838;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 12px 36px rgba(0,0,0,.4);
+        }
+        .chat-header {
+            padding: 8px 12px;
+            border-bottom: 1px solid #232838;
+            display: flex; align-items: center; gap: 6px;
+            font-size: 11px; color: #9aa3b8;
+        }
+        .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .dot.r { background: #ff5f57; } .dot.y { background: #febc2e; } .dot.g { background: #28c840; }
+        .chat-header .title { margin-left: 8px; font-weight: 600; color: #cbd2e2; font-size: 11px; }
+
+        .messages { flex: 1; padding: 12px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+        .msg { max-width: 94%; padding: 9px 11px; border-radius: 10px; font-size: 12px; line-height: 1.45; white-space: pre-wrap; }
+        .msg.user { align-self: flex-end; background: #2057ff; color: #fff; border-bottom-right-radius: 4px; }
+        .msg.ai   { align-self: flex-start; background: #1d212c; color: #dde2f0; border: 1px solid #262b39; border-bottom-left-radius: 4px; }
+
+        .caret { display: inline-block; width: 6px; height: 13px; background: #cbd2e2; vertical-align: -2px; margin-left: 1px; animation: blink 1s steps(2) infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        .footer-bar {
+            border-top: 1px solid #232838;
+            padding: 8px 10px;
+            display: flex; align-items: center; gap: 6px;
+            background: #131620;
+        }
+        .input-fake {
+            flex: 1;
+            background: #1c2030;
+            border: 1px solid #2a3045;
+            border-radius: 8px;
+            padding: 7px 10px;
+            color: #aab1c5; font-size: 11px;
+            min-height: 28px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+        .send-btn {
+            background: #2057ff; color: #fff; border: none;
+            padding: 6px 10px; border-radius: 8px;
+            font-weight: 600; font-size: 11px;
+            display: inline-flex; align-items: center; gap: 4px;
+            white-space: nowrap;
+        }
+        .send-btn.flash { animation: flash .25s ease; }
+        @keyframes flash { 0% { background: #2057ff; } 50% { background: #80a4ff; } 100% { background: #2057ff; } }
+
+        /* Floating keypress badges */
+        .keys { position: absolute; top: 10px; right: 12px; display: flex; gap: 4px; opacity: 0; transition: opacity .2s; z-index: 7; }
+        .keys.show { opacity: 1; }
+        .key { background: #1c2030; border: 1px solid #2a3045; padding: 3px 6px; border-radius: 5px; font-size: 10px; color: #cbd2e2; font-family: ui-monospace, monospace; box-shadow: 0 2px 0 #0a0c12; }
+
+        /* mouse cursor */
+        .cursor {
+            position: absolute;
+            width: 14px; height: 18px;
+            pointer-events: none;
+            transition: top .9s cubic-bezier(.4,.0,.2,1), left .9s cubic-bezier(.4,.0,.2,1);
+            filter: drop-shadow(0 1px 2px rgba(0,0,0,.5));
+            z-index: 10;
+        }
+        .cursor.fast { transition: top .12s linear, left .12s linear; }
+        .cursor svg { width: 100%; height: 100%; }
+
+        /* edit highlights on right side */
+        .edit-pop {
+            position: absolute;
+            font-size: 10px; font-weight: 600;
+            background: #57d68d; color: #0b0d12;
+            padding: 3px 7px; border-radius: 5px;
+            transform: translateY(-16px);
+            opacity: 0; transition: opacity .25s, transform .25s;
+            white-space: nowrap;
+            z-index: 11;
+        }
+        .edit-pop.show { opacity: 1; transform: translateY(-22px); }
+
+        /* Final overlay */
+        .overlay {
+            position: absolute; inset: 0;
+            background: radial-gradient(ellipse at center, rgba(11,13,18,.95) 0%, #0b0d12 70%);
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none;
+            transition: opacity .8s ease;
+            z-index: 50;
+        }
+        .overlay.show { opacity: 1; }
+        .overlay-text {
+            font-size: clamp(30px, 9cqi, 64px);
+            font-weight: 900;
+            letter-spacing: 3px;
+            text-align: center;
+            line-height: 1.05;
+            padding: 0 24px;
+            background: linear-gradient(135deg, #fff 0%, #57d68d 50%, #2057ff 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+            transform: scale(.9); transition: transform .8s cubic-bezier(.2,1.4,.4,1);
+        }
+        .stage { container-type: inline-size; }
+        .overlay.show .overlay-text { transform: scale(1); }
+        .overlay-sub {
+            position: absolute;
+            bottom: 18%;
+            color: #9aa3b8;
+            font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;
+            text-align: center; padding: 0 24px;
+            opacity: 0; transition: opacity .8s ease .4s;
+        }
+        .overlay.show .overlay-sub { opacity: 1; }
+
+        /* Caption strip — placed on the divider between two panes */
+        .caption {
+            position: absolute;
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(15,18,26,.92);
+            backdrop-filter: blur(8px);
+            border: 1px solid #2a3045;
+            padding: 8px 14px;
+            border-radius: 999px;
+            font-size: 12px;
+            color: #cbd2e2;
+            max-width: 88%;
+            text-align: center;
+            z-index: 20;
+            opacity: 0;
+            transition: opacity .3s;
+            box-shadow: 0 6px 18px rgba(0,0,0,.5);
+        }
+        .caption.show { opacity: 1; }
+
+        /* Replay button — outside the reels frame, top-right of viewport */
+        .replay {
+            position: fixed;
+            top: 16px; right: 16px;
+            background: rgba(255,255,255,.08);
+            color: #cbd2e2;
+            border: 1px solid rgba(255,255,255,.12);
+            padding: 7px 12px;
+            border-radius: 10px;
+            font-size: 12px; font-weight: 600;
+            cursor: pointer;
+            z-index: 100;
+            backdrop-filter: blur(8px);
+        }
+        .replay:hover { background: rgba(255,255,255,.14); }
+
+        .progress {
+            position: absolute; top: 0; left: 0;
+            height: 3px; background: linear-gradient(90deg, #2057ff, #57d68d);
+            transition: width .1s linear;
+            z-index: 70;
+        }
+
+        /* Format badge */
+        .format-badge {
+            position: fixed;
+            top: 16px; left: 16px;
+            font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase;
+            color: #6b7280;
+            font-weight: 600;
+            z-index: 100;
+        }
+
+        /* Window switch animation (ChatGPT -> Mail) */
+        .window-stack { position: relative; flex: 1; margin-top: 32px; }
+        .window {
+            position: absolute; inset: 0;
+            transition: opacity .35s ease, transform .35s cubic-bezier(.2,.9,.3,1);
+        }
+        .window.in  { opacity: 1; transform: translateX(0) scale(1); pointer-events: auto; }
+        .window.out-left  { opacity: 0; transform: translateX(-24px) scale(.96); pointer-events: none; }
+        .window.out-right { opacity: 0; transform: translateX( 24px) scale(.96); pointer-events: none; }
+
+        /* Mail app styling */
+        .mail {
+            width: 100%; height: 100%;
+            background: #fdfdfd;
+            color: #1a1a1a;
+            border: 1px solid #d8dde6;
+            border-radius: 12px;
+            display: flex; flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 12px 36px rgba(0,0,0,.4);
+        }
+        .mail-header {
+            padding: 8px 12px;
+            border-bottom: 1px solid #e3e6ed;
+            display: flex; align-items: center; gap: 6px;
+            font-size: 11px; color: #6b7280;
+            background: #f5f6f9;
+        }
+        .mail-header .title { margin-left: 8px; font-weight: 600; color: #2a3041; font-size: 11px; }
+        .mail-fields { display: flex; flex-direction: column; }
+        .mail-field {
+            display: flex; align-items: center;
+            border-bottom: 1px solid #eef0f5;
+            padding: 7px 12px;
+            font-size: 11px;
+        }
+        .mail-field .lbl { color: #8a93a7; width: 56px; font-weight: 600; }
+        .mail-field .val { color: #1a1a1a; }
+        .mail-body {
+            flex: 1;
+            padding: 12px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #2a3041;
+            white-space: pre-wrap;
+            overflow: hidden;
+            position: relative;
+        }
+        .mail-body.flash { background: rgba(32,87,255,.06); animation: pasteFlash .5s ease; }
+        @keyframes pasteFlash { 0%, 100% { background: rgba(32,87,255,0); } 30% { background: rgba(32,87,255,.18); } }
+        .mail-footer {
+            border-top: 1px solid #e3e6ed;
+            padding: 8px 12px;
+            display: flex; justify-content: flex-end; gap: 8px;
+            background: #fafbfd;
+        }
+        .mail-send {
+            background: #2057ff; color: #fff; border: none;
+            padding: 6px 14px; border-radius: 7px;
+            font-weight: 700; font-size: 11px;
+        }
+        .mail-send.flash { animation: flash .25s ease; }
+        .mail-send.sent { background: #1faa55; }
+
+        /* Stronger user banners */
+        .user-banner {
+            position: absolute;
+            top: 8px; left: 50%; transform: translateX(-50%);
+            display: flex; align-items: center; gap: 6px;
+            padding: 4px 10px; border-radius: 999px;
+            font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+            font-weight: 800;
+            z-index: 8;
+            white-space: nowrap;
+        }
+        .user-banner .ball { width: 6px; height: 6px; border-radius: 50%; }
+        .pane-left  .user-banner { background: rgba(255,80,80,.14);  color: #ff6b6b; border: 1px solid rgba(255,80,80,.35);  }
+        .pane-left  .user-banner .ball { background: #ff6b6b; box-shadow: 0 0 8px #ff6b6b; }
+        .pane-right .user-banner { background: rgba(80,200,120,.14); color: #57d68d; border: 1px solid rgba(80,200,120,.35); }
+        .pane-right .user-banner .ball { background: #57d68d; box-shadow: 0 0 8px #57d68d; }
+    </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const PROMPT = "Напиши лист клієнту про затримку поставки на 2 дні";
+const AI_RESPONSE_RAW = "Шановний клієнте,\nна жаль, поставку буде затримано на 2 дні. Перепрошуємо за незручності.\nЗ повагою, команда.";
+const AI_RESPONSE_EDITED = "Шановний Олексію,\nпідтверджую: ваше замовлення №A-2451 буде відвантажено 29.05 (затримка 2 дні через простій на митниці).\nКомпенсуємо безкоштовною доставкою. Готовий обговорити деталі дзвінком сьогодні до 18:00.\nЗ повагою, Ірина";
+
+const CURSOR_SVG = (
+  <svg viewBox="0 0 16 22" xmlns="http://www.w3.org/2000/svg">
+    <path d="M0 0 L0 16 L4.5 12 L7.5 19 L9.5 18 L6.5 11 L12 11 Z" fill="#ffffff" stroke="#000" strokeWidth=".5"/>
+  </svg>
+);
+
+function useTyping(text, speed, start, varSpeed = false) {
+  const [out, setOut] = useState("");
+  useEffect(() => {
+    if (!start) { setOut(""); return; }
+    let i = 0;
+    let cancelled = false;
+    const tick = () => {
+      if (cancelled) return;
+      i++;
+      setOut(text.slice(0, i));
+      if (i < text.length) {
+        const delay = varSpeed ? speed + (Math.random() * speed * 0.8) : speed;
+        setTimeout(tick, delay);
+      }
+    };
+    setTimeout(tick, 40);
+    return () => { cancelled = true; };
+  }, [start, text, speed, varSpeed]);
+  return out;
+}
+
+function LeftPane({ phase }) {
+  // phases: 0 idle, 1 typing prompt, 2 ai reply, 3 select+copy, 4 switch+paste, 5 send, 6 done
+  const promptTyped = useTyping(PROMPT, 40, phase >= 1);
+  const aiTyped = useTyping(AI_RESPONSE_RAW, 18, phase >= 2);
+  const [showKeys, setShowKeys] = useState(null);
+  const [cursor, setCursor] = useState({ top: "30%", left: "30%" });
+  const [sendFlash, setSendFlash] = useState(false);
+  const [pasteFlash, setPasteFlash] = useState(false);
+
+  useEffect(() => {
+    if (phase === 3) {
+      setCursor({ top: "45%", left: "30%" });
+      setShowKeys(["⌘", "C"]);
+      const t = setTimeout(() => setShowKeys(null), 800);
+      return () => clearTimeout(t);
+    }
+    if (phase === 4) {
+      // Window has switched to Mail — paste into body
+      setCursor({ top: "60%", left: "40%" });
+      const tk = setTimeout(() => setShowKeys(["⌘", "V"]), 350);
+      const tk2 = setTimeout(() => setShowKeys(null), 1100);
+      const tp = setTimeout(() => setPasteFlash(true), 380);
+      const tp2 = setTimeout(() => setPasteFlash(false), 900);
+      return () => { clearTimeout(tk); clearTimeout(tk2); clearTimeout(tp); clearTimeout(tp2); };
+    }
+    if (phase === 5) {
+      setCursor({ top: "88%", left: "85%" });
+      const t = setTimeout(() => setSendFlash(true), 500);
+      const t2 = setTimeout(() => setSendFlash(false), 800);
+      return () => { clearTimeout(t); clearTimeout(t2); };
+    }
+  }, [phase]);
+
+  // Window mode: chat for phases 1..3, mail starting phase 4
+  const showMail = phase >= 4;
+  const chatClass = showMail ? "window out-left" : "window in";
+  const mailClass = showMail ? "window in" : "window out-right";
+
+  return (
+    <div className="pane pane-left">
+      <span className="user-banner"><span className="ball"></span>Користувач А · копіює і відправляє</span>
+      <span className={`keys ${showKeys ? "show" : ""}`}>
+        {(showKeys || []).map((k, i) => <span className="key" key={i}>{k}</span>)}
+      </span>
+
+      <div className="window-stack">
+        {/* ChatGPT window */}
+        <div className={chatClass}>
+          <div className="chat" style={{ marginTop: 0, height: "100%" }}>
+            <div className="chat-header">
+              <span className="dot r"></span><span className="dot y"></span><span className="dot g"></span>
+              <span className="title">ChatGPT</span>
+            </div>
+            <div className="messages">
+              {phase >= 1 && (
+                <div className="msg user">
+                  {promptTyped}
+                  {phase === 1 && promptTyped.length < PROMPT.length && <span className="caret"></span>}
+                </div>
+              )}
+              {phase >= 2 && (
+                <div className="msg ai" style={{ outline: phase === 3 ? "2px solid #ff6b6b" : "none", outlineOffset: 2, transition: "outline .2s", boxShadow: phase === 3 ? "0 0 0 4px rgba(255,107,107,.15)" : "none" }}>
+                  {aiTyped}
+                  {phase === 2 && aiTyped.length < AI_RESPONSE_RAW.length && <span className="caret"></span>}
+                </div>
+              )}
+            </div>
+            <div className="footer-bar">
+              <div className="input-fake"><span style={{color:"#5b6480"}}>Повідомлення ChatGPT…</span></div>
+              <button className="send-btn">↑</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mail window */}
+        <div className={mailClass}>
+          <div className="mail">
+            <div className="mail-header">
+              <span className="dot r"></span><span className="dot y"></span><span className="dot g"></span>
+              <span className="title">Пошта — Новий лист</span>
+            </div>
+            <div className="mail-fields">
+              <div className="mail-field"><span className="lbl">Від:</span><span className="val">me@company.com</span></div>
+              <div className="mail-field"><span className="lbl">Кому:</span><span className="val">client@mail.com</span></div>
+              <div className="mail-field"><span className="lbl">Тема:</span><span className="val">Затримка поставки</span></div>
+            </div>
+            <div className={`mail-body ${pasteFlash ? "flash" : ""}`}>
+              {phase >= 4 ? AI_RESPONSE_RAW : ""}
+              {phase === 4 && <span className="caret"></span>}
+            </div>
+            <div className="mail-footer">
+              <button className={`mail-send ${sendFlash ? "flash" : ""} ${phase >= 6 ? "sent" : ""}`}>
+                {phase >= 6 ? "✓ Відправлено" : "Надіслати →"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="cursor fast" style={{ top: cursor.top, left: cursor.left }}>{CURSOR_SVG}</div>
+    </div>
+  );
+}
+
+function RightPane({ phase }) {
+  // phases: 0 idle, 1 typing prompt, 2 ai reply, 3 reading, 4 edit name, 5 edit details, 6 ask "що пропустив", 7 final edit, 8 done
+  const promptTyped = useTyping(PROMPT, 40, phase >= 1);
+  const aiTyped = useTyping(AI_RESPONSE_RAW, 18, phase >= 2);
+  const askTyped = useTyping("Що я пропустив? Перевір тон і конкретику.", 35, phase >= 6, true);
+  const finalTyped = useTyping(AI_RESPONSE_EDITED, 14, phase >= 7);
+
+  const [cursor, setCursor] = useState({ top: "20%", left: "20%" });
+  const [pop, setPop] = useState(null);
+
+  useEffect(() => {
+    if (phase === 3) setCursor({ top: "40%", left: "25%" });
+    if (phase === 4) {
+      setCursor({ top: "42%", left: "55%" });
+      setPop({ text: "+ ім'я клієнта", top: "42%", left: "30%" });
+      const t = setTimeout(() => setPop(null), 1500);
+      return () => clearTimeout(t);
+    }
+    if (phase === 5) {
+      setCursor({ top: "55%", left: "70%" });
+      setPop({ text: "+ номер замовлення, причина", top: "55%", left: "30%" });
+      const t = setTimeout(() => setPop(null), 1600);
+      return () => clearTimeout(t);
+    }
+    if (phase === 6) setCursor({ top: "88%", left: "50%" });
+    if (phase === 7) {
+      setPop({ text: "+ компенсація, дзвінок", top: "60%", left: "30%" });
+      const t = setTimeout(() => setPop(null), 1800);
+      return () => clearTimeout(t);
+    }
+  }, [phase]);
+
+  const showFinal = phase >= 7;
+  const showAsk = phase >= 6;
+
+  return (
+    <div className="pane pane-right">
+      <span className="user-banner"><span className="ball"></span>Користувач Б · читає і виправляє</span>
+      <div className="chat">
+        <div className="chat-header">
+          <span className="dot r"></span><span className="dot y"></span><span className="dot g"></span>
+          <span className="title">ChatGPT</span>
+        </div>
+        <div className="messages">
+          {phase >= 1 && (
+            <div className="msg user">
+              {promptTyped}
+              {phase === 1 && promptTyped.length < PROMPT.length && <span className="caret"></span>}
+            </div>
+          )}
+          {phase >= 2 && !showFinal && (
+            <div className="msg ai">
+              {aiTyped}
+              {phase === 2 && aiTyped.length < AI_RESPONSE_RAW.length && <span className="caret"></span>}
+            </div>
+          )}
+          {showAsk && !showFinal && (
+            <div className="msg user">
+              {askTyped}
+              {phase === 6 && askTyped.length < 41 && <span className="caret"></span>}
+            </div>
+          )}
+          {showFinal && (
+            <div className="msg ai" style={{ borderColor: "#57d68d" }}>
+              {finalTyped}
+              {phase === 7 && finalTyped.length < AI_RESPONSE_EDITED.length && <span className="caret"></span>}
+            </div>
+          )}
+        </div>
+        <div className="footer-bar">
+          <div className="input-fake"><span style={{color:"#5b6480"}}>Працюю над листом…</span></div>
+          <button className="send-btn" style={{ background: phase >= 8 ? "#1faa55" : "#2057ff" }}>
+            {phase >= 8 ? "✓ Готово" : "Send →"}
+          </button>
+        </div>
+      </div>
+      {pop && <span className="edit-pop show" style={{ top: pop.top, left: pop.left }}>{pop.text}</span>}
+      <div className="cursor" style={{ top: cursor.top, left: cursor.left }}>{CURSOR_SVG}</div>
+    </div>
+  );
+}
+
+// Per-pane phase timelines (ms from start). Total = 20000ms.
+const LEFT_TIMELINE = [
+  [0,    1], // typing prompt
+  [1500, 2], // ai reply
+  [3800, 3], // select/copy in chat
+  [4600, 4], // switch to mail + paste
+  [6000, 5], // send
+  [6700, 6]  // sent (idle until end)
+];
+const RIGHT_TIMELINE = [
+  [0,     1], // typing prompt
+  [1700,  2], // ai reply
+  [4200,  3], // reading
+  [5800,  4], // edit name
+  [7400,  5], // edit details
+  [9200,  6], // ask "що пропустив"
+  [11500, 7], // final edit
+  [16500, 8]  // done
+];
+
+const TOTAL = 20000;
+
+function pickPhase(timeline, t) {
+  let p = 0;
+  for (const [at, ph] of timeline) {
+    if (t >= at) p = ph;
+  }
+  return p;
+}
+
+function App() {
+  const [t, setT] = useState(0);
+  const [running, setRunning] = useState(true);
+  const startRef = useRef(performance.now());
+
+  useEffect(() => {
+    if (!running) return;
+    let raf;
+    const loop = (now) => {
+      const elapsed = now - startRef.current;
+      setT(Math.min(elapsed, TOTAL + 1000));
+      if (elapsed < TOTAL + 1000) raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [running]);
+
+  const replay = () => {
+    startRef.current = performance.now();
+    setT(0);
+    setRunning(true);
+  };
+
+  const leftPhase = pickPhase(LEFT_TIMELINE, t);
+  const rightPhase = pickPhase(RIGHT_TIMELINE, t);
+  const showOverlay = t >= TOTAL - 3000;
+  const progress = Math.min(100, (t / TOTAL) * 100);
+
+  return (
+    <>
+      <span className="format-badge">Reels · 9:16</span>
+      <button className="replay" onClick={replay}>↻ Повторити</button>
+      <div className="stage">
+        <div className="progress" style={{ width: `${progress}%` }} />
+        <LeftPane phase={leftPhase} />
+        <RightPane phase={rightPhase} />
+        <div className={`overlay ${showOverlay ? "show" : ""}`}>
+          <div className="overlay-text">РІЗНИЦЯ —<br/>В РУКАХ</div>
+          <div className="overlay-sub">один інструмент · різні люди · різний результат</div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
